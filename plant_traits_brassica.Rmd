@@ -1,0 +1,425 @@
+---
+title: "plant_trais_brassica"
+author: "Durga Chinthalapudi"
+date: "2024-12-23"
+output: html_document
+---
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+library(patchwork)
+library(corrplot)
+library(metan)
+library(openxlsx)
+library(patchwork)
+library(tidyverse)
+library(ggradar)
+library(tidyverse)
+library(scales)
+library(readxl)
+
+
+devtools::install_github("xl0418/ggradar2",dependencies=TRUE)
+devtools::install_github("ricardo-bion/ggradar",dependencies=TRUE)
+install.packages("ggradar")
+install.packages("tidyverse")
+install.packages("scales")
+install.packages("metan")
+install.packages("openxlsx")
+```
+
+```{r}
+data = readxl::read_xlsx("plant_traits.xlsx")
+
+data <- data %>%
+  mutate(Treatment = factor(Treatment, levels = c("Control", "Drought", "Salt")),
+         Cultivar = factor(Cultivar_Name))
+
+```
+
+```{r}
+# Panel 1: Boxplots for Treatment only
+panel1 <- ggplot(data, aes(x = Treatment, y = Plant_height, fill = Treatment)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.2, alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "", y = "Plant Height", x = "Treatment") +
+  theme(legend.position = "none",
+        panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        axis.text.x = element_text(face = "bold")) # Bold x-axis labels
+
+# Panel 2: Boxplots for each Genotype and Treatment
+panel2 <- ggplot(data, aes(x = Treatment, y = Plant_height, fill = Treatment)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.2, alpha = 0.7) +
+  facet_wrap(~ Cultivar_Name, nrow = 2) + # Adjust nrow for layout
+  theme_minimal() +
+  labs(title = "", y = "Plant Height", x = "Treatment") +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"), # Bold x-axis labels
+        strip.text = element_text(face = "bold"), # Bold genotype (facet) names
+        panel.border = element_rect(color = "black", fill = NA, size = 1)) + # Add panel borders
+  theme(panel.background = element_rect(fill = "white")) # Optional: Set background white
+
+# Combine panels
+combined_plot <- panel1 + panel2 + plot_layout(widths = c(1, 2)) # Adjust widths if needed
+
+# Display combined plot
+print(combined_plot)
+
+ggsave("plant_height.pdf", plot = combined_plot, 
+       width = 9, height = 7, units = "in", 
+       dpi = 1000)
+```
+
+##automated code
+
+```{r}
+
+# Function to generate and save plots for a given variable
+generate_plot <- function(variable_name, data, output_dir = "plots") {
+  # Dynamically create aesthetic mapping
+  aes_y <- as.name(variable_name)
+  
+  # Panel 1: Boxplots for Treatment only
+  panel1 <- ggplot(data, aes(x = Treatment, y = !!aes_y, fill = Treatment)) +
+    geom_boxplot(outlier.shape = NA) +
+    geom_jitter(width = 0.2, alpha = 0.7) +
+    theme_minimal() +
+    labs(title = "", y = variable_name, x = "Treatment") +
+    theme(legend.position = "none",
+          panel.border = element_rect(color = "black", fill = NA, size = 1), 
+          axis.text.x = element_text(face = "bold")) # Bold x-axis labels
+  
+  # Panel 2: Boxplots for each Genotype and Treatment
+  panel2 <- ggplot(data, aes(x = Treatment, y = !!aes_y, fill = Treatment)) +
+    geom_boxplot(outlier.shape = NA) +
+    geom_jitter(width = 0.2, alpha = 0.7) +
+    facet_wrap(~ Cultivar_Name, nrow = 2) + # Adjust nrow for layout
+    theme_minimal() +
+    labs(title = "", y = variable_name, x = "Treatment") +
+    theme(legend.position = "none",
+          axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"), # Bold x-axis labels
+          strip.text = element_text(face = "bold"), # Bold genotype (facet) names
+          panel.border = element_rect(color = "black", fill = NA, size = 1)) + # Add panel borders
+    theme(panel.background = element_rect(fill = "white")) # Optional: Set background white
+  
+  # Combine panels
+  combined_plot <- panel1 + panel2 + plot_layout(widths = c(1, 2)) # Adjust widths if needed
+  
+  # Ensure the output directory exists
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir)
+  }
+  
+  # Save the combined plot
+  output_file <- file.path(output_dir, paste0(variable_name, ".pdf"))
+  ggsave(output_file, plot = combined_plot, 
+         width = 9, height = 7, units = "in", dpi = 1000)
+  
+  message("Saved plot for ", variable_name, " to ", output_file)
+}
+
+# List of variables to plot
+variables_to_plot <- c("Plant_height", "Leaf_no.", "Leaf_area", "Leaf_dry_wt", 
+                       "Stem_dry_wt", "Root_dry_wt", "Shoot_wt", "Total_wt", 
+                       "Root/shoot", "Chl", "Flav", "Anth", "NBI", 
+                       "CT", "gsw", "E_apparent", "Fs", "Fm", 
+                       "PhiPS2", "ETR", "Tref", "Tleaf", "CTD")
+
+# Loop through all variables and generate plots
+for (var in variables_to_plot) {
+  generate_plot(var, data, output_dir = "plots")
+}
+
+```
+
+
+```{r}
+
+library(ggplot2)
+library(patchwork)#2A9D8F
+
+# Define custom colors for the treatments
+custom_colors <- c("Control" = "#2A9D8F", "Drought" = "#E63946", "Salt" = "#457B9D")
+
+# Function to generate and save plots for a given category
+generate_category_plot <- function(category_name, variable_list, data, output_dir = "category_plots") {
+  
+  # Convert data to long format for grouped plotting
+  data_long <- data %>%
+    select(Treatment, all_of(variable_list)) %>%
+    pivot_longer(cols = all_of(variable_list), names_to = "Variable", values_to = "Value") %>%
+    mutate(Variable = factor(Variable, levels = variable_list))  # Set factor levels
+  
+  # Create boxplot for overall treatment effect with multiple variables
+  plot <- ggplot(data_long, aes(x = Treatment, y = Value, fill = Treatment)) +
+    geom_boxplot(outlier.shape = NA) +
+    geom_jitter(width = 0.2, alpha = 0.7) +
+    facet_wrap(~ Variable, scales = "free_y", nrow = 2) + # Free scale for different units
+    theme_minimal() +
+    labs(title = paste(category_name, "Variables - Treatment Effect"), y = "Value", x = "Treatment") +
+    scale_fill_manual(values = custom_colors) +  # Apply custom colors
+    theme(legend.position = "none",
+          strip.text = element_text(face = "bold"),  # Bold facet labels
+          axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"), # Rotate x-axis labels
+          panel.border = element_rect(color = "black", fill = NA, size = 1), # Add panel borders
+          panel.background = element_rect(fill = "white")) # White background
+  
+  # Ensure the output directory exists
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir)
+  }
+  
+  # Save the plot
+  output_file <- file.path(output_dir, paste0(category_name, ".pdf"))
+  ggsave(output_file, plot = plot, width = 9, height = 7, units = "in", dpi = 1000)
+  
+  message("Saved category plot for ", category_name, " to ", output_file)
+}
+
+# Define variable categories
+categories <- list(
+  "Growth" = c("Plant_height", "Leaf_no.", "Leaf_area"), 
+  "Biomass" = c("Shoot_wt", "Root_dry_wt", "Total_wt", "Root/shoot"),
+  "Pigments" = c("Chl", "Flav", "Anth", "NBI"),
+  "Physiology" = c("gsw", "E_apparent", "PhiPS2", "ETR","CT", "CTD")
+)
+
+# Generate plots for each category
+for (category in names(categories)) {
+  generate_category_plot(category, categories[[category]], data, output_dir = "category_plots")
+}
+
+
+```
+## Radar plots for all variables based on category
+```{r}
+library(ggradar)
+library(ggplot2)
+library(patchwork)
+library(dplyr)
+library(scales)
+
+# Define variable categories with their correct order
+growth <- c("Plant_height", "Leaf_no.", "Leaf_area")
+pigments <- c("Chl", "Flav", "Anth", "NBI")
+biomass <- c("Shoot_wt", "Root_dry_wt", "Total_wt", "Root/shoot")
+physiology <- c("gsw", "E_apparent", "PhiPS2", "ETR", "CT", "CTD")
+
+# List of categories and their corresponding variables
+categories <- list(
+  "Growth" = growth,
+  "Pigments" = pigments,
+  "Biomass" = biomass,
+  "Physiology" = physiology
+)
+
+# Define custom colors for treatments
+custom_colors <- c("Control" = "#2A9D8F", "Drought" = "#E63946", "Salt" = "#457B9D")
+
+# Output directory for plots
+output_dir <- "radar_plots"
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+}
+
+# Loop through categories to generate separate panels
+for (category in names(categories)) {
+  
+  variable_list <- categories[[category]]  # Get variables for this category
+  plot_list <- list()  # Store plots for this category
+  
+  for (var in variable_list) {
+    
+    # Prepare data
+    data_var <- data %>%
+      select(Cultivar_Name, Treatment, all_of(var)) %>%
+      group_by(Treatment, Cultivar_Name) %>%
+      summarise(across(everything(), mean, na.rm = TRUE), .groups = "drop") %>%
+      pivot_wider(names_from = Cultivar_Name, values_from = var)
+    
+    # Scale values between 0 and 1
+    data_scaled <- data_var %>%
+      mutate(across(where(is.numeric), ~ rescale(., to = c(0, 1)))) %>%
+      rename(group = Treatment)
+    
+    # Generate radar plot
+    p <- ggradar(data_scaled,
+                 axis.label.size = 4,  
+                 group.line.width = 1.2,  
+                 group.point.size = 2,    
+                 gridline.min.linetype = "dotted",
+                 legend.position = "bottom") +
+      scale_color_manual(values = custom_colors) +  
+      theme(plot.title = element_text(size = 10, face = "bold")) +  
+      ggtitle(var)
+    
+    # Save individual radar plot
+    ggsave(filename = file.path(output_dir, paste0(var, "_radar_plot.pdf")), 
+           plot = p, device = "pdf", width = 7, height = 7)
+    
+    plot_list[[var]] <- p
+  }
+  
+  # Ensure radar plots appear in the defined order
+  ordered_plots <- lapply(variable_list, function(var) plot_list[[var]]) 
+  
+  # Create a panel with all plots in this category
+  category_panel <- wrap_plots(ordered_plots, ncol = 3) + 
+    plot_annotation(title = paste(category, "Traits Across Genotypes"))
+  
+  # Save category panel
+  ggsave(file.path(output_dir, paste0(category, "_panel.pdf")), 
+         plot = category_panel, device = "pdf", width = 14, height = 10, dpi = 1000)
+  
+  print(paste("Saved panel for", category))
+}
+
+```
+
+
+
+# Regression analysis
+
+```{r}
+library(ggplot2)
+library(tidyr)
+
+install.packages("ggpmisc")
+library(ggpmisc)
+
+
+
+data = readxl::read_xlsx("indices relationships.xlsx", sheet = "drought")
+
+data_salt = readxl::read_xlsx("indices relationships.xlsx", sheet = "salt")
+
+# Convert the data to long format
+drought_linear <- data %>%
+  pivot_longer(cols = c("Growth", "Biomass", "Physiology"), 
+               names_to = "Category", 
+               values_to = "Value")
+
+salt_linear = data_salt %>%
+  pivot_longer(cols = c("Growth", "Biomass", "Physiology"), 
+               names_to = "Category", 
+               values_to = "Value")
+
+# Create the plot
+drought = ggplot(drought_linear, aes(x = `Drought index`, y = Value, color = Category, shape = Category)) +
+  geom_point(size = 3) +  # Add points with size adjustment
+  geom_smooth(method = "lm", se = FALSE) +  # Add regression lines
+  stat_poly_eq(
+    aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
+    formula = y ~ x,  # Directly pass the formula
+    parse = TRUE
+  ) +  # Add regression equations and R² values
+  labs(
+    title = "",
+    x = "", 
+    y = "Growth, biomass, and physiology response index"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1.5),  # Black border
+    legend.position = "top"  # Move legend to the top
+  )
+
+drought
+
+# Create the plot
+salt = ggplot(salt_linear, aes(x = `Salt index`, y = Value, color = Category, shape = Category)) +
+  geom_point(size = 3) +  # Add points with size adjustment
+  geom_smooth(method = "lm", se = FALSE) +  # Add regression lines
+  stat_poly_eq(
+    aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
+    formula = y ~ x,  # Directly pass the formula
+    parse = TRUE
+  ) +  # Add regression equations and R² values
+  labs(
+    title = "",
+    x = "Combined salt response index", 
+    y = "Growth, biomass, and physiology response index"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1.5),  # Black border
+    legend.position = "top"  # Move legend to the top
+  )
+
+salt
+
+# Combine the plots with the desired layout
+combined_plot <- drought / salt +  # Stack the plots vertically
+  plot_layout(guides = "collect") +  # Combine legends into one
+  plot_annotation(
+    title = "",
+    theme = theme(plot.title = element_text(size = 16, face = "bold"))
+  ) &
+  theme(
+    legend.position = "right",  # Move the legend to the side
+    axis.title.x = element_blank(),  # Remove x-axis title for the first plot
+    plot.margin = margin(10, 10, 10, 10)  # Add some spacing
+  )
+
+combined_plot
+
+ggsave("regression_plot.pdf", plot = combined_plot, 
+       width = 6, height = 9, units = "in", 
+       dpi = 1000)
+```
+
+# Percentage change in variables
+
+```{r}
+library(tidyverse)
+
+numeric_vars <- c("Plant_height", "Leaf_no.", "Leaf_area", "Root_dry_wt", "Shoot_wt", "Total_wt", "Root/shoot",
+                  "Chl", "Flav", "Anth", "NBI", "CT", "gsw", "E_apparent", "PhiPS2", "ETR", "CTD", "GRVI", "GCI", 
+                  "GLI", "SR", "MSR", "TDVI", "VARI", "WDRVI", "MSI", "SIWSI")
+
+data_percent_change <- data %>%
+  select(Cultivar_Name, Treatment, all_of(numeric_vars)) %>%  # Keep only relevant columns
+  pivot_longer(cols = all_of(numeric_vars), names_to = "Variable", values_to = "Value") %>%
+  group_by(Cultivar_Name, Variable, Treatment) %>%  # Group before summarizing
+  summarise(Value = mean(Value, na.rm = TRUE), .groups = "drop") %>%  # Take mean to remove duplicates
+  pivot_wider(names_from = Treatment, values_from = Value) %>%  # Convert to wide format
+  mutate(Drought_Percent_Change = ((Drought - Control) / Control) * 100,
+         Salt_Percent_Change = ((Salt - Control) / Control) * 100) %>%
+  select(Cultivar_Name, Variable, Drought_Percent_Change, Salt_Percent_Change)    # Keep relevant columns
+
+# Display results
+print(data_percent_change)
+
+# Save results to CSV
+write.csv(data_percent_change, "percentage_change_results.csv", row.names = FALSE)
+
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
